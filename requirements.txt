@@ -1,2 +1,2 @@
-Entertelethon
+telethon
 colorama
