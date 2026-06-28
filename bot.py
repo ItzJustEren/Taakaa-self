@@ -321,7 +321,7 @@ if __name__ == '__main__':
         asyncio.run(main_menu())
     except KeyboardInterrupt:
         clear_screen()
-        print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL})
     except Exception as e:
         print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
         input(f"\n{Fore.YELLOW}Press Enter to exit...{Style.RESET_ALL}")
