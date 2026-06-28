@@ -1,4 +1,10 @@
 🤖 TaaKaa-Self Bot
+![GitHub stars](https://img.shields.io/github/stars/ItzJustEren/TaaKaa-self?style=social)
+![GitHub forks](https://img.shields.io/github/forks/ItzJustEren/TaaKaa-self?style=social)
+![GitHub issues](https://img.shields.io/github/issues/ItzJustEren/TaaKaa-self)
+![GitHub license](https://img.shields.io/github/license/ItzJustEren/TaaKaa-self)
+![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)
+![Telethon Version](https://img.shields.io/badge/telethon-latest-green) 
 
 یه ربات ساده و کاربردی برای تلگرام که بهت کمک میکنه پیام‌های تکراری رو به صورت خودکار در گروه‌ها یا کانال‌ها ارسال کنی!
 
