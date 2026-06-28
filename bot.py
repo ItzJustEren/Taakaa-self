@@ -5,16 +5,11 @@ import sys
 import msvcrt
 import json
 from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 from colorama import Fore, Style, init
 
-# رنگ‌آمیزی
 init(autoreset=True)
 
-# فایل کانفیگ
 CONFIG_FILE = 'config.json'
-
-# متغیرهای گلوبال
 client = None
 target_chat = None
 interval = 300
@@ -91,9 +86,9 @@ def print_menu(options, selected=0):
 async def login_with_qr():
     global client
     print_logo()
-    print(f"{Fore.CYAN}📱 Login with QR Code{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}1. QR Code در ترمینال نمایش داده میشه{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}2. با تلگرام گوشی اسکنش کن (Settings → Devices){Style.RESET_ALL}")
+    print(f"{Fore.CYAN}📱 Login with Phone Number{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}1. شماره موبایل خودت رو وارد کن{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}2. کد تایید رو از تلگرام دریافت کن{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}3. وارد اکانتت میشی!{Style.RESET_ALL}")
     print()
     
@@ -104,7 +99,8 @@ async def login_with_qr():
             await client.start()
             print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی (از سشن)!{Style.RESET_ALL}")
         else:
-            client = TelegramClient(StringSession(), 0, '')
+            # اینجا دیگه از StringSession استفاده نمیکنیم
+            client = TelegramClient('session', 0, '')
             await client.start()
             print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی!{Style.RESET_ALL}")
             if always_login:
@@ -148,7 +144,7 @@ async def set_always_login():
         return
     
     print(f"{Fore.YELLOW}⚠️  با فعال‌سازی این گزینه، سشن شما برای همیشه ذخیره میشه{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}⚠️  دیگه نیازی به QR Code نخواهید داشت{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}⚠️  دیگه نیازی به لاگین مجدد نخواهید داشت{Style.RESET_ALL}")
     confirm = input(f"{Fore.CYAN}Enable Always Login? (y/n): {Style.RESET_ALL}")
     
     if confirm.lower() == 'y':
@@ -195,7 +191,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
-        global target_chat, interval, message_text, is_running, task
+        nonlocal target_chat, interval, message_text, is_running, task
         
         msg = event.message.text
         if not msg or msg.startswith('/'):
@@ -235,7 +231,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
-        global is_running, task
+        nonlocal is_running, task
         if is_running:
             is_running = False
             if task:
@@ -245,7 +241,7 @@ async def run_bot():
             await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
-        global is_running
+        nonlocal is_running
         while is_running:
             try:
                 if target_chat:
@@ -265,7 +261,7 @@ async def main_menu():
     load_config()
     
     options = [
-        "Login with QR Code",
+        "Login with Phone Number",
         "Set Timer",
         "Set Always Login",
         "Support us (GitHub & Telegram)",
