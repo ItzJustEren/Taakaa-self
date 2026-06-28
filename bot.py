@@ -1,40 +1,208 @@
 import asyncio
 import re
+import os
+import sys
+import msvcrt
+import json
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-import os
-import webbrowser
-import qrcode
-from PIL import Image
+from colorama import Fore, Style, init
 
-print("🤖 TaaKaa-Self Bot - Login with QR Code")
-print("=" * 50)
-print("📱 1. یه QR کد برات میاد")
-print("📱 2. با تلگرام گوشی اسکنش کن")
-print("📱 3. وارد اکانتت میشی بدون نیاز به api!")
-print("=" * 50)
+# رنگ‌آمیزی
+init(autoreset=True)
 
-async def main():
-    # با یه سشن خالی شروع کن (نیاز به api نداره!)
-    client = TelegramClient(StringSession(), 0, '')
+# فایل کانفیگ
+CONFIG_FILE = 'config.json'
+
+# متغیرهای گلوبال
+client = None
+target_chat = None
+interval = 300  # ۵ دقیقه
+message_text = 'میو'
+is_running = False
+task = None
+always_login = False
+
+def load_config():
+    """بارگذاری تنظیمات"""
+    global interval, always_login
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                interval = config.get('interval', 300)
+                always_login = config.get('always_login', False)
+            return True
+    except:
+        pass
+    return False
+
+def save_config():
+    """ذخیره تنظیمات"""
+    config = {
+        'interval': interval,
+        'always_login': always_login
+    }
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+        return True
+    except:
+        return False
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_logo():
+    clear_screen()
+    logo = f"""
+{Fore.GREEN}╔═══════════════════════════════════════╗
+{Fore.GREEN}║                                       ║
+{Fore.GREEN}║   {Fore.LIGHTGREEN_EX}████████╗  █████╗  █████╗  ██╗  ██╗  █████╗  █████╗  {Fore.GREEN}║
+{Fore.GREEN}║   {Fore.LIGHTGREEN_EX}╚══██╔══╝ ██╔══██╗██╔══██╗██║ ██╔╝ ██╔══██╗██╔══██╗{Fore.GREEN}║
+{Fore.GREEN}║   {Fore.LIGHTGREEN_EX}   ██║    ███████║███████║█████╔╝  ███████║███████║{Fore.GREEN}║
+{Fore.GREEN}║   {Fore.LIGHTGREEN_EX}   ██║    ██╔══██║██╔══██║██╔═██╗  ██╔══██║██╔══██║{Fore.GREEN}║
+{Fore.GREEN}║   {Fore.LIGHTGREEN_EX}   ██║    ██║  ██║██║  ██║██║  ██╗ ██║  ██║██║  ██║{Fore.GREEN}║
+{Fore.GREEN}║                                       ║
+{Fore.GREEN}║        {Fore.LIGHTGREEN_EX}✨ TaaKaa-Self Bot ✨{Fore.GREEN}        ║
+{Fore.GREEN}╚═══════════════════════════════════════╝{Style.RESET_ALL}
+    """
+    print(logo)
+
+def print_menu(options, selected=0):
+    print_logo()
+    print(f"{Fore.CYAN}╔═══════════════════════════════════════╗")
+    print(f"{Fore.CYAN}║      {Fore.YELLOW}Use ↑/↓ arrows to navigate{Fore.CYAN}      ║")
+    print(f"{Fore.CYAN}║       {Fore.YELLOW}Press Enter to select{Fore.CYAN}           ║")
+    print(f"{Fore.CYAN}╚═══════════════════════════════════════╝")
+    print()
     
-    # لاگین با QR کد
-    await client.start()
+    for i, option in enumerate(options):
+        if i == selected:
+            print(f"{Fore.GREEN}▶ {option}{Style.RESET_ALL}")
+        else:
+            print(f"  {option}")
     
-    print("\n✅ با موفقیت وارد شدی!")
-    print("📝 حالا برو به Saved Messages و بنویس /start")
-    print("📝 برای خروج Ctrl+C رو بزن")
+    # نمایش وضعیت لاگین
+    status_color = Fore.GREEN if client else Fore.RED
+    status_text = "✅ Logged in" if client else "❌ Not logged in"
+    print(f"\n{Fore.CYAN}╔═══════════════════════════════════════╗")
+    print(f"{Fore.CYAN}║  {Fore.YELLOW}Status:{Style.RESET_ALL} {status_color}{status_text}{Style.RESET_ALL}          {Fore.CYAN}║")
+    print(f"{Fore.CYAN}╚═══════════════════════════════════════╝")
+    print(f"\n{Fore.YELLOW}Press Ctrl+C to exit{Style.RESET_ALL}")
+
+async def login_with_qr():
+    """ورود با QR Code"""
+    global client
+    print_logo()
+    print(f"{Fore.CYAN}📱 Login with QR Code{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}1. QR Code در ترمینال نمایش داده میشه{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}2. با تلگرام گوشی اسکنش کن (Settings → Devices){Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}3. وارد اکانتت میشی!{Style.RESET_ALL}")
+    print()
     
-    # متغیرها
-    target_chat = None
-    interval = 300  # ۵ دقیقه
-    message_text = 'میو'
-    is_running = False
-    task = None
+    try:
+        # اگر Always Login فعاله و سشن وجود داره
+        if always_login and os.path.exists('session.session'):
+            print(f"{Fore.CYAN}🔐 استفاده از سشن ذخیره شده...{Style.RESET_ALL}")
+            client = TelegramClient('session', 0, '')
+            await client.start()
+            print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی (از سشن)!{Style.RESET_ALL}")
+        else:
+            client = TelegramClient(StringSession(), 0, '')
+            await client.start()
+            print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی!{Style.RESET_ALL}")
+            
+            # اگه Always Login فعاله، سشن رو ذخیره کن
+            if always_login:
+                print(f"{Fore.CYAN}💾 سشن برای همیشه ذخیره شد{Style.RESET_ALL}")
+        
+        input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}❌ خطا: {e}{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+        return False
+
+async def set_timer():
+    """تنظیم تایمر"""
+    global interval
+    print_logo()
+    print(f"{Fore.CYAN}⏰ Set Timer{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}Current timer: {interval//60} minutes{Style.RESET_ALL}")
+    print()
+    
+    try:
+        minutes = input(f"{Fore.CYAN}Enter minutes (default 5): {Style.RESET_ALL}")
+        if minutes.strip():
+            interval = int(minutes) * 60
+            save_config()
+            print(f"{Fore.GREEN}✅ Timer set to {minutes} minutes{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.GREEN}✅ Timer kept at {interval//60} minutes{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+    except:
+        print(f"{Fore.RED}❌ Invalid input!{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+
+async def set_always_login():
+    """فعال‌سازی Always Login"""
+    global always_login
+    print_logo()
+    print(f"{Fore.CYAN}🔐 Always Login Mode{Style.RESET_ALL}")
+    
+    if always_login:
+        print(f"{Fore.GREEN}✅ Already enabled!{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+        return
+    
+    print(f"{Fore.YELLOW}⚠️  با فعال‌سازی این گزینه، سشن شما برای همیشه ذخیره میشه{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}⚠️  دیگه نیازی به QR Code نخواهید داشت{Style.RESET_ALL}")
+    confirm = input(f"{Fore.CYAN}Enable Always Login? (y/n): {Style.RESET_ALL}")
+    
+    if confirm.lower() == 'y':
+        always_login = True
+        save_config()
+        print(f"{Fore.GREEN}✅ Always Login enabled!{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}💾 دفعه بعد با سشن ذخیره شده وارد میشی{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.RED}❌ Cancelled{Style.RESET_ALL}")
+    
+    input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+
+def support_us():
+    """پشتیبانی"""
+    print_logo()
+    print(f"{Fore.CYAN}📢 Support Us{Style.RESET_ALL}")
+    print(f"\n{Fore.GREEN}📱 Telegram Channel:{Style.RESET_ALL}")
+    print(f"   {Fore.YELLOW}https://t.me/TaaKaaOrg{Style.RESET_ALL}")
+    print(f"\n{Fore.GREEN}🐙 GitHub Repository:{Style.RESET_ALL}")
+    print(f"   {Fore.YELLOW}https://github.com/ItzJustEren/TaaKaa-Self{Style.RESET_ALL}")
+    print(f"\n{Fore.CYAN}📢 Support Group:{Style.RESET_ALL}")
+    print(f"   {Fore.YELLOW}https://t.me/TaaKaaOrg{Style.RESET_ALL}")
+    print(f"\n{Fore.YELLOW}💡 Follow us for updates and support!{Style.RESET_ALL}")
+    
+    input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+
+async def run_bot():
+    """اجرای ربات"""
+    global client, target_chat, interval, message_text, is_running, task
+    
+    print_logo()
+    print(f"{Fore.GREEN}🚀 Starting TaaKaa-Self Bot...{Style.RESET_ALL}")
+    
+    if not client:
+        print(f"{Fore.RED}❌ Please login first!{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return...{Style.RESET_ALL}")
+        return
+    
+    print(f"{Fore.CYAN}📝 Bot is running... Check Saved Messages{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}💡 Type /start in Saved Messages to begin{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}💡 Type /stop in Saved Messages to stop{Style.RESET_ALL}")
     
     @client.on(events.NewMessage(pattern='/start', from_me=True))
     async def start_command(event):
-        await event.respond('🤖 ربات راه‌اندازی شد!\n\nلطفاً آیدی یا لینک گپ موردنظر رو وارد کن:\n(مثل @mygroup یا https://t.me/mygroup)')
+        await event.respond('🤖 Bot started!\n\nSend chat ID/link (e.g. @mygroup):')
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
@@ -44,39 +212,37 @@ async def main():
         if not msg or msg.startswith('/'):
             return
         
-        # مرحله ۱: دریافت آیدی گپ
         if target_chat is None:
             try:
                 chat = await client.get_entity(msg)
                 target_chat = chat
-                await event.respond(f'✅ گپ "{chat.title}" ذخیره شد!\n⏰ زمان بین ارسال پیام‌ها رو وارد کن (مثلاً ۵):')
+                await event.respond(f'✅ Chat "{chat.title}" saved!\n⏰ Enter timer (minutes):')
             except Exception as e:
-                await event.respond(f'❌ خطا! گپ پیدا نشد. دوباره تلاش کن:\n{e}')
+                await event.respond(f'❌ Invalid chat! Try again:\n{e}')
         
-        # مرحله ۲: دریافت زمان
         elif interval == 300 and target_chat is not None:
             try:
                 numbers = re.findall(r'\d+', msg)
                 if numbers:
                     minutes = int(numbers[0])
                     interval = minutes * 60
-                    await event.respond(f'⏰ زمان تنظیم شد: هر {minutes} دقیقه\n✏️ پیام مورد نظر رو وارد کن (مثلاً میو):')
+                    save_config()
+                    await event.respond(f'⏰ Timer: {minutes} minutes\n✏️ Enter message text:')
                 else:
-                    await event.respond('❌ عدد معتبر وارد کن! مثل: 5')
+                    await event.respond('❌ Enter valid number (e.g. 5):')
             except:
-                await event.respond('❌ خطا! عدد معتبر وارد کن.')
+                await event.respond('❌ Invalid input!')
         
-        # مرحله ۳: دریافت پیام
         elif message_text == 'میو' and target_chat is not None and interval != 300:
             message_text = msg
-            await event.respond(f'✅ پیام ذخیره شد: "{message_text}"\n🚀 شروع ارسال هر {interval//60} دقیقه...')
+            await event.respond(f'✅ Message saved: "{message_text}"\n🚀 Starting...')
             
             if is_running and task:
                 task.cancel()
             
             is_running = True
             task = asyncio.create_task(send_periodic())
-            await event.respond('✅ ربات فعال شد! برای توقف /stop رو بزن.')
+            await event.respond(f'✅ Bot active!\n📤 Sending "{message_text}" every {interval//60} minutes\n🛑 Send /stop to stop.')
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
@@ -85,9 +251,9 @@ async def main():
             is_running = False
             if task:
                 task.cancel()
-            await event.respond('⛔ ربات متوقف شد!')
+            await event.respond('⛔ Bot stopped! Send /start to restart.')
         else:
-            await event.respond('⚠️ ربات در حال اجرا نیست!')
+            await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
         nonlocal is_running
@@ -95,11 +261,10 @@ async def main():
             try:
                 if target_chat:
                     await client.send_message(target_chat, message_text)
-                    print(f'✅ "{message_text}" فرستاده شد به {target_chat.title}')
+                    print(f'{Fore.GREEN}✅ Message "{message_text}" sent to {target_chat.title}{Style.RESET_ALL}')
             except Exception as e:
-                print(f'❌ خطا: {e}')
+                print(f'{Fore.RED}❌ Error: {e}{Style.RESET_ALL}')
             
-            # شمارش معکوس
             for _ in range(interval):
                 if not is_running:
                     break
@@ -107,11 +272,56 @@ async def main():
     
     await client.run_until_disconnected()
 
+async def main_menu():
+    """منوی اصلی"""
+    load_config()
+    
+    options = [
+        "Login with QR Code",
+        "Set Timer",
+        "Set Always Login",
+        "Support us (GitHub & Telegram)",
+        "Start Bot"
+    ]
+    selected = 0
+    
+    while True:
+        print_menu(options, selected)
+        
+        try:
+            key = msvcrt.getch()
+            
+            if key == b'\xe0':
+                key = msvcrt.getch()
+                if key == b'H':
+                    selected = (selected - 1) % len(options)
+                elif key == b'P':
+                    selected = (selected + 1) % len(options)
+            elif key == b'\r':
+                clear_screen()
+                if selected == 0:
+                    await login_with_qr()
+                elif selected == 1:
+                    await set_timer()
+                elif selected == 2:
+                    await set_always_login()
+                elif selected == 3:
+                    support_us()
+                elif selected == 4:
+                    await run_bot()
+            elif key == b'\x03':
+                clear_screen()
+                print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
+                break
+        except:
+            pass
+
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        asyncio.run(main_menu())
     except KeyboardInterrupt:
-        print("\n👋 خداحافظ!")
+        clear_screen()
+        print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
     except Exception as e:
-        print(f"\n❌ خطا: {e}")
-        input("Enter بزن تا خارج شی...")
+        print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to exit...{Style.RESET_ALL}")
