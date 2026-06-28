@@ -99,7 +99,6 @@ async def login_with_qr():
             await client.start()
             print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی (از سشن)!{Style.RESET_ALL}")
         else:
-            # اینجا دیگه از StringSession استفاده نمیکنیم
             client = TelegramClient('session', 0, '')
             await client.start()
             print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی!{Style.RESET_ALL}")
@@ -191,7 +190,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
-        nonlocal target_chat, interval, message_text, is_running, task
+        global target_chat, interval, message_text, is_running, task
         
         msg = event.message.text
         if not msg or msg.startswith('/'):
@@ -231,7 +230,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
-        nonlocal is_running, task
+        global is_running, task
         if is_running:
             is_running = False
             if task:
@@ -241,7 +240,7 @@ async def run_bot():
             await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
-        nonlocal is_running
+        global is_running
         while is_running:
             try:
                 if target_chat:
