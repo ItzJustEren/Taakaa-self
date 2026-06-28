@@ -17,14 +17,13 @@ CONFIG_FILE = 'config.json'
 # متغیرهای گلوبال
 client = None
 target_chat = None
-interval = 300  # ۵ دقیقه
+interval = 300
 message_text = 'میو'
 is_running = False
 task = None
 always_login = False
 
 def load_config():
-    """بارگذاری تنظیمات"""
     global interval, always_login
     try:
         if os.path.exists(CONFIG_FILE):
@@ -38,7 +37,6 @@ def load_config():
     return False
 
 def save_config():
-    """ذخیره تنظیمات"""
     config = {
         'interval': interval,
         'always_login': always_login
@@ -83,7 +81,6 @@ def print_menu(options, selected=0):
         else:
             print(f"  {option}")
     
-    # نمایش وضعیت لاگین
     status_color = Fore.GREEN if client else Fore.RED
     status_text = "✅ Logged in" if client else "❌ Not logged in"
     print(f"\n{Fore.CYAN}╔═══════════════════════════════════════╗")
@@ -92,7 +89,6 @@ def print_menu(options, selected=0):
     print(f"\n{Fore.YELLOW}Press Ctrl+C to exit{Style.RESET_ALL}")
 
 async def login_with_qr():
-    """ورود با QR Code"""
     global client
     print_logo()
     print(f"{Fore.CYAN}📱 Login with QR Code{Style.RESET_ALL}")
@@ -102,7 +98,6 @@ async def login_with_qr():
     print()
     
     try:
-        # اگر Always Login فعاله و سشن وجود داره
         if always_login and os.path.exists('session.session'):
             print(f"{Fore.CYAN}🔐 استفاده از سشن ذخیره شده...{Style.RESET_ALL}")
             client = TelegramClient('session', 0, '')
@@ -112,8 +107,6 @@ async def login_with_qr():
             client = TelegramClient(StringSession(), 0, '')
             await client.start()
             print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی!{Style.RESET_ALL}")
-            
-            # اگه Always Login فعاله، سشن رو ذخیره کن
             if always_login:
                 print(f"{Fore.CYAN}💾 سشن برای همیشه ذخیره شد{Style.RESET_ALL}")
         
@@ -125,7 +118,6 @@ async def login_with_qr():
         return False
 
 async def set_timer():
-    """تنظیم تایمر"""
     global interval
     print_logo()
     print(f"{Fore.CYAN}⏰ Set Timer{Style.RESET_ALL}")
@@ -146,7 +138,6 @@ async def set_timer():
         input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
 async def set_always_login():
-    """فعال‌سازی Always Login"""
     global always_login
     print_logo()
     print(f"{Fore.CYAN}🔐 Always Login Mode{Style.RESET_ALL}")
@@ -171,7 +162,6 @@ async def set_always_login():
     input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
 def support_us():
-    """پشتیبانی"""
     print_logo()
     print(f"{Fore.CYAN}📢 Support Us{Style.RESET_ALL}")
     print(f"\n{Fore.GREEN}📱 Telegram Channel:{Style.RESET_ALL}")
@@ -185,7 +175,6 @@ def support_us():
     input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
 async def run_bot():
-    """اجرای ربات"""
     global client, target_chat, interval, message_text, is_running, task
     
     print_logo()
@@ -206,7 +195,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
-        nonlocal target_chat, interval, message_text, is_running, task
+        global target_chat, interval, message_text, is_running, task
         
         msg = event.message.text
         if not msg or msg.startswith('/'):
@@ -246,7 +235,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
-        nonlocal is_running, task
+        global is_running, task
         if is_running:
             is_running = False
             if task:
@@ -256,7 +245,7 @@ async def run_bot():
             await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
-        nonlocal is_running
+        global is_running
         while is_running:
             try:
                 if target_chat:
@@ -273,7 +262,6 @@ async def run_bot():
     await client.run_until_disconnected()
 
 async def main_menu():
-    """منوی اصلی"""
     load_config()
     
     options = [
