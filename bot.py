@@ -21,6 +21,8 @@ message_text = 'میو'
 is_running = False
 task = None
 always_login = False
+api_id = None
+api_hash = None
 
 # ===== بارگذاری و ذخیره تنظیمات =====
 def load_config():
@@ -93,48 +95,52 @@ def print_menu(options, selected=0):
 
 # ===== تنظیم API =====
 def set_api_credentials():
+    global api_id, api_hash
     print_logo()
     print(f"{Fore.CYAN}🔑 Environment Variables{Style.RESET_ALL}")
     print()
     
-    api_id = input(f"{Fore.CYAN}Enter API_ID (number): {Style.RESET_ALL}").strip()
-    if not api_id.isdigit():
-        print(f"{Fore.RED}❌ Invalid API_ID!{Style.RESET_ALL}")
+    api_id_input = input(f"{Fore.CYAN}Enter API_ID (number): {Style.RESET_ALL}").strip()
+    if not api_id_input.isdigit():
+        print(f"{Fore.RED}❌ Invalid API_ID! Must be a number.{Style.RESET_ALL}")
         input("Press Enter...")
         return
     
-    api_hash = input(f"{Fore.CYAN}Enter API_HASH (string): {Style.RESET_ALL}").strip()
-    if len(api_hash) < 10:
-        print(f"{Fore.RED}❌ Invalid API_HASH!{Style.RESET_ALL}")
+    api_hash_input = input(f"{Fore.CYAN}Enter API_HASH (string): {Style.RESET_ALL}").strip()
+    if len(api_hash_input) < 10:
+        print(f"{Fore.RED}❌ Invalid API_HASH! Too short.{Style.RESET_ALL}")
         input("Press Enter...")
         return
     
-    os.environ['API_ID'] = api_id
-    os.environ['API_HASH'] = api_hash
-    print(f"\n{Fore.GREEN}✅ Saved successfully!{Style.RESET_ALL}")
+    api_id = int(api_id_input)
+    api_hash = api_hash_input
+    print(f"\n{Fore.GREEN}✅ API credentials saved successfully!{Style.RESET_ALL}")
     input("Press Enter...")
 
 # ===== ورود با شماره =====
 async def login_with_phone():
-    global client
+    global client, api_id, api_hash
     print_logo()
     print(f"{Fore.CYAN}📱 Login with Phone Number{Style.RESET_ALL}")
     print()
     
-    api_id = os.environ.get('API_ID')
-    api_hash = os.environ.get('API_HASH')
-    
     if not api_id or not api_hash:
-        print(f"{Fore.RED}❌ Set API credentials first!{Style.RESET_ALL}")
+        print(f"{Fore.RED}❌ Please set API credentials first (Option 1)!{Style.RESET_ALL}")
         input("Press Enter...")
         return
     
     try:
-        client = TelegramClient('session', int(api_id), api_hash)
-        await client.start()
-        print(f"\n{Fore.GREEN}✅ Logged in successfully!{Style.RESET_ALL}")
-        if always_login:
-            print(f"{Fore.CYAN}💾 Session saved{Style.RESET_ALL}")
+        if always_login and os.path.exists('session.session'):
+            print(f"{Fore.CYAN}🔐 Using saved session...{Style.RESET_ALL}")
+            client = TelegramClient('session', api_id, api_hash)
+            await client.start()
+            print(f"\n{Fore.GREEN}✅ Logged in from session!{Style.RESET_ALL}")
+        else:
+            client = TelegramClient('session', api_id, api_hash)
+            await client.start()
+            print(f"\n{Fore.GREEN}✅ Logged in successfully!{Style.RESET_ALL}")
+            if always_login:
+                print(f"{Fore.CYAN}💾 Session saved permanently{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
     
@@ -148,11 +154,17 @@ async def set_timer():
     print()
     
     try:
-        minutes = input(f"{Fore.CYAN}Enter minutes: {Style.RESET_ALL}").strip()
+        minutes = input(f"{Fore.CYAN}Enter minutes (minimum 1): {Style.RESET_ALL}").strip()
         if minutes:
-            interval = int(minutes) * 60
-            save_config()
-            print(f"{Fore.GREEN}✅ Timer set to {minutes} minutes{Style.RESET_ALL}")
+            new_interval = int(minutes) * 60
+            if new_interval < 60:
+                print(f"{Fore.RED}❌ Minimum is 1 minute!{Style.RESET_ALL}")
+            else:
+                interval = new_interval
+                save_config()
+                print(f"{Fore.GREEN}✅ Timer set to {minutes} minutes{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.GREEN}✅ Timer unchanged ({interval//60} min){Style.RESET_ALL}")
     except:
         print(f"{Fore.RED}❌ Invalid input!{Style.RESET_ALL}")
     
@@ -166,7 +178,7 @@ async def set_always_login():
     print()
     
     if always_login:
-        print(f"{Fore.GREEN}✅ Already enabled{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}✅ Already enabled!{Style.RESET_ALL}")
         input("Press Enter...")
         return
     
@@ -175,6 +187,7 @@ async def set_always_login():
         always_login = True
         save_config()
         print(f"{Fore.GREEN}✅ Always Login enabled!{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}💾 Session will be saved permanently{Style.RESET_ALL}")
     else:
         print(f"{Fore.RED}❌ Cancelled{Style.RESET_ALL}")
     
@@ -183,9 +196,12 @@ async def set_always_login():
 # ===== پشتیبانی =====
 def support_us():
     print_logo()
-    print(f"{Fore.CYAN}📢 Support{Style.RESET_ALL}")
-    print(f"\n{Fore.GREEN}📱 Telegram: @TaaKaaOrg{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}🐙 GitHub: ItzJustEren/TaaKaa-Self{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}📢 Support Us{Style.RESET_ALL}")
+    print(f"\n{Fore.GREEN}📱 Telegram Channel:{Style.RESET_ALL}")
+    print(f"   {Fore.YELLOW}https://t.me/TaaKaaOrg{Style.RESET_ALL}")
+    print(f"\n{Fore.GREEN}🐙 GitHub Repository:{Style.RESET_ALL}")
+    print(f"   {Fore.YELLOW}https://github.com/ItzJustEren/TaaKaa-Self{Style.RESET_ALL}")
+    print(f"\n{Fore.YELLOW}💡 Follow us for updates!{Style.RESET_ALL}")
     input("\nPress Enter...")
 
 # ===== اجرای ربات =====
@@ -193,18 +209,20 @@ async def run_bot():
     global client, target_chat, interval, message_text, is_running, task
     
     print_logo()
-    print(f"{Fore.GREEN}🚀 Starting Bot...{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}🚀 Starting TaaKaa-Self Bot...{Style.RESET_ALL}")
     
     if not client:
-        print(f"{Fore.RED}❌ Login first!{Style.RESET_ALL}")
+        print(f"{Fore.RED}❌ Please login first (Option 2)!{Style.RESET_ALL}")
         input("Press Enter...")
         return
     
-    print(f"{Fore.CYAN}📝 Check Saved Messages for /start{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}📝 Bot is running... Check Saved Messages{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}💡 Type /start in Saved Messages to begin{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}💡 Type /stop in Saved Messages to stop{Style.RESET_ALL}")
     
     @client.on(events.NewMessage(pattern='/start', from_me=True))
     async def start_command(event):
-        await event.respond('🤖 Bot started!\nSend chat ID/link:')
+        await event.respond('🤖 Bot started!\n\nSend chat ID/link (e.g. @mygroup):')
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
@@ -218,29 +236,36 @@ async def run_bot():
             try:
                 chat = await client.get_entity(msg)
                 target_chat = chat
-                await event.respond(f'✅ Chat "{chat.title}" saved!\nEnter timer (minutes):')
+                await event.respond(f'✅ Chat "{chat.title}" saved!\n⏰ Enter timer (minutes):')
             except Exception as e:
-                await event.respond(f'❌ Error: {e}')
+                await event.respond(f'❌ Invalid chat! Try again:\n{e}')
         
-        elif interval == 300 and target_chat:
+        elif interval == 300 and target_chat is not None:
             try:
-                minutes = int(re.findall(r'\d+', msg)[0])
-                interval = minutes * 60
-                save_config()
-                await event.respond(f'⏰ Timer: {minutes} min\nEnter message text:')
+                numbers = re.findall(r'\d+', msg)
+                if numbers:
+                    minutes = int(numbers[0])
+                    if minutes < 1:
+                        await event.respond('❌ Minimum is 1 minute!')
+                    else:
+                        interval = minutes * 60
+                        save_config()
+                        await event.respond(f'⏰ Timer: {minutes} minutes\n✏️ Enter message text:')
+                else:
+                    await event.respond('❌ Enter valid number (e.g. 5):')
             except:
-                await event.respond('❌ Enter a number!')
+                await event.respond('❌ Invalid input!')
         
-        elif message_text == 'میو' and target_chat and interval != 300:
+        elif message_text == 'میو' and target_chat is not None and interval != 300:
             message_text = msg
-            await event.respond(f'✅ Message: "{message_text}"\n🚀 Starting...')
+            await event.respond(f'✅ Message saved: "{message_text}"\n🚀 Starting...')
             
             if is_running and task:
                 task.cancel()
             
             is_running = True
             task = asyncio.create_task(send_periodic())
-            await event.respond(f'✅ Active! Sending every {interval//60} min\nSend /stop to stop.')
+            await event.respond(f'✅ Bot active!\n📤 Sending "{message_text}" every {interval//60} minutes\n🛑 Send /stop to stop.')
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
@@ -249,9 +274,9 @@ async def run_bot():
             is_running = False
             if task:
                 task.cancel()
-            await event.respond('⛔ Stopped! Send /start to restart.')
+            await event.respond('⛔ Bot stopped! Send /start to restart.')
         else:
-            await event.respond('⚠️ Not running!')
+            await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
         nonlocal is_running
@@ -259,7 +284,7 @@ async def run_bot():
             try:
                 if target_chat:
                     await client.send_message(target_chat, message_text)
-                    print(f'{Fore.GREEN}✅ Sent "{message_text}" to {target_chat.title}{Style.RESET_ALL}')
+                    print(f'{Fore.GREEN}✅ Message "{message_text}" sent to {target_chat.title}{Style.RESET_ALL}')
             except Exception as e:
                 print(f'{Fore.RED}❌ Error: {e}{Style.RESET_ALL}')
             
@@ -273,20 +298,23 @@ async def run_bot():
 # ===== منوی اصلی =====
 async def main_menu():
     load_config()
+    
     options = [
-        "Environment Variables",
-        "Login with Phone",
+        "Environment Variables (Set API_ID & API_HASH)",
+        "Login with Phone Number",
         "Set Timer",
-        "Always Login",
-        "Support",
+        "Set Always Login",
+        "Support us (GitHub & Telegram)",
         "Start Bot"
     ]
     selected = 0
     
     while True:
         print_menu(options, selected)
+        
         try:
             key = msvcrt.getch()
+            
             if key == b'\xe0':
                 key = msvcrt.getch()
                 if key == b'H':
@@ -322,4 +350,4 @@ if __name__ == '__main__':
         print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
-        input("Press Enter...")
+        input(f"\n{Fore.YELLOW}Press Enter to exit...{Style.RESET_ALL}")
