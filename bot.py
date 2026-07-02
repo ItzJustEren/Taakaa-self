@@ -2,14 +2,19 @@ import asyncio
 import re
 import os
 import sys
-import msvcrt
 import json
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from colorama import Fore, Style, init
+import msvcrt
 
+# ===== رنگ‌آمیزی =====
 init(autoreset=True)
 
+# ===== فایل کانفیگ =====
 CONFIG_FILE = 'config.json'
+
+# ===== متغیرهای گلوبال =====
 client = None
 target_chat = None
 interval = 300
@@ -18,6 +23,7 @@ is_running = False
 task = None
 always_login = False
 
+# ===== بارگذاری و ذخیره تنظیمات =====
 def load_config():
     global interval, always_login
     try:
@@ -43,9 +49,11 @@ def save_config():
     except:
         return False
 
+# ===== پاک کردن صفحه =====
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+# ===== لوگو =====
 def print_logo():
     clear_screen()
     logo = f"""
@@ -62,20 +70,22 @@ def print_logo():
     """
     print(logo)
 
-def print_menu(options, selected=0):
+# ===== نمایش منو (با پشتیبانی از فلش و شماره) =====
+def print_menu(options, selected=0, is_phone=False):
     print_logo()
     print(f"{Fore.CYAN}╔═══════════════════════════════════════╗")
-    print(f"{Fore.CYAN}║      {Fore.YELLOW}Use ↑/↓ arrows to navigate{Fore.CYAN}      ║")
+    print(f"{Fore.CYAN}║      {Fore.YELLOW}Use ↑/↓ arrows or 1-{len(options)} keys{Fore.CYAN}      ║")
     print(f"{Fore.CYAN}║       {Fore.YELLOW}Press Enter to select{Fore.CYAN}           ║")
     print(f"{Fore.CYAN}╚═══════════════════════════════════════╝")
     print()
     
     for i, option in enumerate(options):
         if i == selected:
-            print(f"{Fore.GREEN}▶ {option}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}▶ {i+1}. {option}{Style.RESET_ALL}")
         else:
-            print(f"  {option}")
+            print(f"  {i+1}. {option}")
     
+    # نمایش وضعیت لاگین
     status_color = Fore.GREEN if client else Fore.RED
     status_text = "✅ Logged in" if client else "❌ Not logged in"
     print(f"\n{Fore.CYAN}╔═══════════════════════════════════════╗")
@@ -83,35 +93,78 @@ def print_menu(options, selected=0):
     print(f"{Fore.CYAN}╚═══════════════════════════════════════╝")
     print(f"\n{Fore.YELLOW}Press Ctrl+C to exit{Style.RESET_ALL}")
 
-async def login_with_qr():
+# ===== تنظیم API_ID و API_HASH =====
+def set_api_credentials():
+    print_logo()
+    print(f"{Fore.CYAN}🔑 Environment Variables (Most Important){Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}📝 Get your API from: https://my.telegram.org{Style.RESET_ALL}")
+    print()
+    
+    # دریافت API_ID
+    print(f"{Fore.CYAN}Enter API_ID (number):{Style.RESET_ALL}")
+    api_id = input("> ").strip()
+    if not api_id.isdigit():
+        print(f"{Fore.RED}❌ API_ID must be a number!{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return...{Style.RESET_ALL}")
+        return None, None
+    
+    # دریافت API_HASH
+    print(f"{Fore.CYAN}Enter API_HASH (string):{Style.RESET_ALL}")
+    api_hash = input("> ").strip()
+    if len(api_hash) < 10:
+        print(f"{Fore.RED}❌ API_HASH is too short!{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return...{Style.RESET_ALL}")
+        return None, None
+    
+    # ذخیره در متغیرهای محیطی (موقت)
+    os.environ['API_ID'] = api_id
+    os.environ['API_HASH'] = api_hash
+    
+    print(f"\n{Fore.GREEN}✅ API credentials saved successfully!{Style.RESET_ALL}")
+    input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
+    return api_id, api_hash
+
+# ===== ورود با شماره و کد =====
+async def login_with_phone():
     global client
     print_logo()
     print(f"{Fore.CYAN}📱 Login with Phone Number{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}1. شماره موبایل خودت رو وارد کن{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}2. کد تایید رو از تلگرام دریافت کن{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}3. وارد اکانتت میشی!{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}1. Enter your phone number with country code{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}2. Enter the verification code from Telegram{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}3. You're logged in!{Style.RESET_ALL}")
     print()
+    
+    # چک کردن API credentials
+    api_id = os.environ.get('API_ID')
+    api_hash = os.environ.get('API_HASH')
+    
+    if not api_id or not api_hash:
+        print(f"{Fore.RED}❌ Please set API_ID and API_HASH first!{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}💡 Go to 'Environment Variables' option in menu{Style.RESET_ALL}")
+        input(f"\n{Fore.YELLOW}Press Enter to return...{Style.RESET_ALL}")
+        return False
     
     try:
         if always_login and os.path.exists('session.session'):
-            print(f"{Fore.CYAN}🔐 استفاده از سشن ذخیره شده...{Style.RESET_ALL}")
-            client = TelegramClient('session', 0, '')
+            print(f"{Fore.CYAN}🔐 Using saved session...{Style.RESET_ALL}")
+            client = TelegramClient('session', int(api_id), api_hash)
             await client.start()
-            print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی (از سشن)!{Style.RESET_ALL}")
+            print(f"\n{Fore.GREEN}✅ Logged in successfully (from session)!{Style.RESET_ALL}")
         else:
-            client = TelegramClient('session', 0, '')
+            client = TelegramClient('session', int(api_id), api_hash)
             await client.start()
-            print(f"\n{Fore.GREEN}✅ با موفقیت وارد شدی!{Style.RESET_ALL}")
+            print(f"\n{Fore.GREEN}✅ Logged in successfully!{Style.RESET_ALL}")
             if always_login:
-                print(f"{Fore.CYAN}💾 سشن برای همیشه ذخیره شد{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}💾 Session saved forever{Style.RESET_ALL}")
         
         input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
         return True
     except Exception as e:
-        print(f"{Fore.RED}❌ خطا: {e}{Style.RESET_ALL}")
+        print(f"{Fore.RED}❌ Error: {e}{Style.RESET_ALL}")
         input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
         return False
 
+# ===== تنظیم تایمر =====
 async def set_timer():
     global interval
     print_logo()
@@ -132,6 +185,7 @@ async def set_timer():
         print(f"{Fore.RED}❌ Invalid input!{Style.RESET_ALL}")
         input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
+# ===== فعال‌سازی Always Login =====
 async def set_always_login():
     global always_login
     print_logo()
@@ -142,20 +196,21 @@ async def set_always_login():
         input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
         return
     
-    print(f"{Fore.YELLOW}⚠️  با فعال‌سازی این گزینه، سشن شما برای همیشه ذخیره میشه{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}⚠️  دیگه نیازی به لاگین مجدد نخواهید داشت{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}⚠️  Enable this to save your session forever{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}⚠️  You won't need to login again{Style.RESET_ALL}")
     confirm = input(f"{Fore.CYAN}Enable Always Login? (y/n): {Style.RESET_ALL}")
     
     if confirm.lower() == 'y':
         always_login = True
         save_config()
         print(f"{Fore.GREEN}✅ Always Login enabled!{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}💾 دفعه بعد با سشن ذخیره شده وارد میشی{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}💾 Your session will be saved permanently{Style.RESET_ALL}")
     else:
         print(f"{Fore.RED}❌ Cancelled{Style.RESET_ALL}")
     
     input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
+# ===== پشتیبانی =====
 def support_us():
     print_logo()
     print(f"{Fore.CYAN}📢 Support Us{Style.RESET_ALL}")
@@ -169,6 +224,7 @@ def support_us():
     
     input(f"\n{Fore.YELLOW}Press Enter to return to menu...{Style.RESET_ALL}")
 
+# ===== اجرای ربات =====
 async def run_bot():
     global client, target_chat, interval, message_text, is_running, task
     
@@ -190,7 +246,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
-        global target_chat, interval, message_text, is_running, task
+        nonlocal target_chat, interval, message_text, is_running, task
         
         msg = event.message.text
         if not msg or msg.startswith('/'):
@@ -230,7 +286,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
-        global is_running, task
+        nonlocal is_running, task
         if is_running:
             is_running = False
             if task:
@@ -240,7 +296,7 @@ async def run_bot():
             await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
-        global is_running
+        nonlocal is_running
         while is_running:
             try:
                 if target_chat:
@@ -256,10 +312,12 @@ async def run_bot():
     
     await client.run_until_disconnected()
 
+# ===== منوی اصلی =====
 async def main_menu():
     load_config()
     
     options = [
+        "Environment Variables (Set API_ID & API_HASH)",
         "Login with Phone Number",
         "Set Timer",
         "Set Always Login",
@@ -267,38 +325,66 @@ async def main_menu():
         "Start Bot"
     ]
     selected = 0
+    is_phone = False
     
     while True:
-        print_menu(options, selected)
+        print_menu(options, selected, is_phone)
         
         try:
-            key = msvcrt.getch()
-            
-            if key == b'\xe0':
+            if sys.stdin.isatty():
+                # حالت کیبورد (دسکتاپ)
                 key = msvcrt.getch()
-                if key == b'H':
-                    selected = (selected - 1) % len(options)
-                elif key == b'P':
-                    selected = (selected + 1) % len(options)
-            elif key == b'\r':
-                clear_screen()
-                if selected == 0:
-                    await login_with_qr()
-                elif selected == 1:
-                    await set_timer()
-                elif selected == 2:
-                    await set_always_login()
-                elif selected == 3:
-                    support_us()
-                elif selected == 4:
-                    await run_bot()
-            elif key == b'\x03':
-                clear_screen()
-                print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
-                break
+                
+                if key == b'\xe0':
+                    key = msvcrt.getch()
+                    if key == b'H':
+                        selected = (selected - 1) % len(options)
+                    elif key == b'P':
+                        selected = (selected + 1) % len(options)
+                elif key == b'\r':
+                    clear_screen()
+                    if selected == 0:
+                        set_api_credentials()
+                    elif selected == 1:
+                        await login_with_phone()
+                    elif selected == 2:
+                        await set_timer()
+                    elif selected == 3:
+                        await set_always_login()
+                    elif selected == 4:
+                        support_us()
+                    elif selected == 5:
+                        await run_bot()
+                elif key == b'\x03':
+                    clear_screen()
+                    print(f"{Fore.GREEN}👋 Goodbye!{Style.RESET_ALL}")
+                    break
+            else:
+                # حالت غیرفعال (ترمینال‌های محدود)
+                choice = input(f"\n{Fore.YELLOW}Enter option number (1-{len(options)}): {Style.RESET_ALL}")
+                try:
+                    num = int(choice)
+                    if 1 <= num <= len(options):
+                        selected = num - 1
+                        clear_screen()
+                        if selected == 0:
+                            set_api_credentials()
+                        elif selected == 1:
+                            await login_with_phone()
+                        elif selected == 2:
+                            await set_timer()
+                        elif selected == 3:
+                            await set_always_login()
+                        elif selected == 4:
+                            support_us()
+                        elif selected == 5:
+                            await run_bot()
+                except:
+                    pass
         except:
             pass
 
+# ===== اجرای اصلی =====
 if __name__ == '__main__':
     try:
         asyncio.run(main_menu())
