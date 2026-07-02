@@ -1,19 +1,15 @@
 import asyncio
 import re
 import os
-import sys
 import json
 from telethon import TelegramClient, events
 from colorama import Fore, Style, init
 import msvcrt
 
-# ===== رنگ‌آمیزی =====
 init(autoreset=True)
 
-# ===== فایل کانفیگ =====
 CONFIG_FILE = 'config.json'
 
-# ===== متغیرهای گلوبال =====
 client = None
 target_chat = None
 interval = 300
@@ -24,7 +20,6 @@ always_login = False
 api_id = None
 api_hash = None
 
-# ===== بارگذاری و ذخیره تنظیمات =====
 def load_config():
     global interval, always_login
     try:
@@ -50,11 +45,9 @@ def save_config():
     except:
         return False
 
-# ===== پاک کردن صفحه =====
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-# ===== لوگو =====
 def print_logo():
     clear_screen()
     logo = f"""
@@ -71,7 +64,6 @@ def print_logo():
     """
     print(logo)
 
-# ===== نمایش منو =====
 def print_menu(options, selected=0):
     print_logo()
     print(f"{Fore.CYAN}╔═══════════════════════════════════════╗")
@@ -93,7 +85,6 @@ def print_menu(options, selected=0):
     print(f"{Fore.CYAN}╚═══════════════════════════════════════╝")
     print(f"\n{Fore.YELLOW}Press Ctrl+C to exit{Style.RESET_ALL}")
 
-# ===== تنظیم API =====
 def set_api_credentials():
     global api_id, api_hash
     print_logo()
@@ -117,7 +108,6 @@ def set_api_credentials():
     print(f"\n{Fore.GREEN}✅ API credentials saved successfully!{Style.RESET_ALL}")
     input("Press Enter...")
 
-# ===== ورود با شماره =====
 async def login_with_phone():
     global client, api_id, api_hash
     print_logo()
@@ -146,7 +136,6 @@ async def login_with_phone():
     
     input("Press Enter...")
 
-# ===== تنظیم تایمر =====
 async def set_timer():
     global interval
     print_logo()
@@ -170,7 +159,6 @@ async def set_timer():
     
     input("Press Enter...")
 
-# ===== Always Login =====
 async def set_always_login():
     global always_login
     print_logo()
@@ -193,7 +181,6 @@ async def set_always_login():
     
     input("Press Enter...")
 
-# ===== پشتیبانی =====
 def support_us():
     print_logo()
     print(f"{Fore.CYAN}📢 Support Us{Style.RESET_ALL}")
@@ -204,7 +191,6 @@ def support_us():
     print(f"\n{Fore.YELLOW}💡 Follow us for updates!{Style.RESET_ALL}")
     input("\nPress Enter...")
 
-# ===== اجرای ربات =====
 async def run_bot():
     global client, target_chat, interval, message_text, is_running, task
     
@@ -226,7 +212,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(from_me=True))
     async def handle_messages(event):
-        nonlocal target_chat, interval, message_text, is_running, task
+        global target_chat, interval, message_text, is_running, task
         
         msg = event.message.text
         if not msg or msg.startswith('/'):
@@ -269,7 +255,7 @@ async def run_bot():
     
     @client.on(events.NewMessage(pattern='/stop', from_me=True))
     async def stop_command(event):
-        nonlocal is_running, task
+        global is_running, task
         if is_running:
             is_running = False
             if task:
@@ -279,7 +265,7 @@ async def run_bot():
             await event.respond('⚠️ Bot is not running!')
     
     async def send_periodic():
-        nonlocal is_running
+        global is_running
         while is_running:
             try:
                 if target_chat:
@@ -295,7 +281,6 @@ async def run_bot():
     
     await client.run_until_disconnected()
 
-# ===== منوی اصلی =====
 async def main_menu():
     load_config()
     
